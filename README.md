@@ -1,4 +1,4 @@
-# Fast 6-DoF Object Pose Estimation with Event Cameras
+Fast 6-DoF Object Pose Estimation with Event Cameras
 ======================================
 
 Objectives
