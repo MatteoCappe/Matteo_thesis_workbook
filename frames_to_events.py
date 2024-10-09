@@ -187,10 +187,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Extract binary events from sequence of frames')
     parser.add_argument('--input', '-i', dest='input_path', type=str, required=False,
                         help='Path to input file',
-                        default='/home/cappe/Users/matte/Desktop/uni5/Tesi/tesi IIT/code/photorealistic_test/')
+                        default='/home/cappe/Users/matte/Desktop/uni5/Tesi/IIT/code/photorealistic_test/')
     parser.add_argument('--output', '-o', dest='output_path', type=str, required=False,
                         help='Path to output file',
-                        default='/home/cappe/Users/matte/Desktop/uni5/Tesi/tesi IIT/code/photorealistic_test/')
+                        default='/home/cappe/Users/matte/Desktop/uni5/Tesi/IIT/code/photorealistic_test/')
     args = parser.parse_args()
 
     input_path = args.input_path
