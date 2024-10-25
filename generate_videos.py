@@ -28,16 +28,18 @@ def generate_video_from_images(image_dir, output_video_path, fps=30):
     # Release video
     video.release()
     print(f"Video saved at {output_video_path}")
+    
+# synthetic dataset: "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/SCARF_tuning/SP/alpha1_0-C0_1/alpha1_0-C0_1_points.mp4"
 
-image_directory = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/SCARF_tests/mustard_SCARF/SP_test_dimension"
-output_video = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/SCARF_tests/mustard_SCARF/SP_test_dimension/mustard_SCARF.mp4"
-output_video_github = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/SCARF_tests/mustard_SCARF/SP_test_dimension/mustard_SCARF_github.mp4"   
+image_directory = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/SCARF_tests/mustard_dumping/sensitivity50/events5/SP"
+output_video = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/SCARF_tests/mustard_dumping/sensitivity50/events5/SP_events5.mp4"
+output_video_github = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/SCARF_tests/mustard_dumping/sensitivity50/events5/SP_event5_github.mp4"   
 
 # delete video if it already exists
 if os.path.exists(output_video):
   os.remove(output_video)
 
-generate_video_from_images(image_directory, output_video, fps=30) # for dataset videos put 500, for real event camera video usually 120, for SP put the one of the original video?
+generate_video_from_images(image_directory, output_video, fps=240) # for dataset videos put 500, for real event camera video usually 120/240, for SP put the one of the original video?
 
 if os.path.exists(output_video_github):
   os.remove(output_video_github)   
