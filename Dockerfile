@@ -9,6 +9,7 @@ RUN apt update
 # basic dependencies
 RUN apt update && \
     apt install -y \
+    python3.7 \
     python3-pip \
     wget \
     git \
