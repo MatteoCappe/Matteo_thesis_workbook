@@ -28,21 +28,39 @@ RUN apt install -y \
 RUN pip install torch torchvision torchaudio
 
 # Install the other dependencies via pip
-RUN pip install --no-cache-dir numpy ipython matplotlib tqdm pylint jupyterlab scipy numba ipdb yacs timm
+RUN pip install --no-cache-dir numpy matplotlib opencv-python
     
 # Clone and install SuperPointPretrainedNetwork
 RUN git clone https://github.com/magicleap/SuperPointPretrainedNetwork.git /opt/SuperPointPretrainedNetwork && \
     cd /opt/SuperPointPretrainedNetwork
+RUN echo "SPP installed!"
 
 # Clone and install SuperGluePretrainedNetwork
 RUN git clone https://github.com/magicleap/SuperGluePretrainedNetwork.git /opt/SuperGluePretrainedNetwork && \
     cd /opt/SuperGluePretrainedNetwork
+RUN echo "SG installed!"
 
 # version specifics for OnePose
-RUN pip install --no-cache-dir h5py loguru albumentations pytorch-lightning aiohttp aioredis pydegensac opencv-python opencv-python-headless einops kornia pickle5 hydra-core omegaconf pycocotools wandb rich transforms3d natsort
+#RUN pip install --no-cache-dir ipython tqdm pylint jupyterlab scipy numba ipdb yacs timm h5py loguru albumentations pytorch-lightning aiohttp aioredis pydegensac einops kornia pickle5 hydra-core omegaconf pycocotools wandb rich transforms3d natsort
 
 # ==3.1.0 ==0.5.3==0.5.1 ==1.5.10 ==3.7 ==1.3.1 ==0.1.2 ==4.1.2.30 ==4.4.0.46 ==0.3.0 ==0.4.1 ==0.0.11 ==1.1.1 ==2.1.2 # ==2.0.4 ==0.12.17 ==12.4.4 ==0.3.1 ==8.1.0
 
 # Clone and install OnePose
-RUN git clone https://github.com/zju3dv/OnePose.git /opt/OnePose && \
-    cd /opt/OnePose 
+#RUN git clone https://github.com/zju3dv/OnePose.git /opt/OnePose && \
+#    cd /opt/OnePose
+#RUN echo "OnePose installed!"
+
+# Add User ID and Group ID
+ARG UNAME=6dof_estimation
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g $GID -o $UNAME
+RUN useradd -m -u $UID -g $GID -o -s /bin/bash $UNAME
+
+# Add User into sudoers, can run sudo command without password
+RUN apt update && apt install -y sudo
+RUN usermod -aG sudo ${UNAME}
+RUN echo "${UNAME} ALL=(ALL) NOPASSWD:ALL" | tee /etc/sudoers.d/${UNAME}
+
+USER $UNAME
+WORKDIR /home/${UNAME}
