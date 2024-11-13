@@ -1,6 +1,9 @@
 # Use Ubuntu 22.04 as the base image
 FROM ubuntu:22.04
+FROM nvidia/cuda:12.2.2-base-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES graphics,utility,compute
 
 ARG CODE_DIR=/usr/local/src
 
@@ -22,13 +25,19 @@ RUN apt install -y \
     python3-dev \
     python3-distutils \
     python3-pip \
-    libopencv-dev
+    libopencv-dev \
+    pciutils \
+    nano
 
 # Upgrade pip and install PyTorch and torchvision
 RUN pip install torch torchvision torchaudio
 
 # Install the other dependencies via pip
 RUN pip install --no-cache-dir numpy matplotlib opencv-python
+
+# Install nvidia driver and cuda
+RUN apt install nvidia-driver-535 -y \
+    nvidia-cuda-toolkit
     
 # Clone and install SuperPointPretrainedNetwork
 RUN git clone https://github.com/magicleap/SuperPointPretrainedNetwork.git /opt/SuperPointPretrainedNetwork && \
