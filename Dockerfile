@@ -1,5 +1,5 @@
 # Use Ubuntu 22.04 as the base image
-FROM ubuntu:22.04
+#FROM ubuntu:22.04
 FROM nvidia/cuda:12.2.0-base-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NVIDIA_VISIBLE_DEVICES all
