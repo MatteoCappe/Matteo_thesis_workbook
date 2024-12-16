@@ -19,12 +19,14 @@ torch.set_grad_enabled(False)
 matplotlib.use('TkAgg')         # needed for plotting the disparity map, idk why
 print(matplotlib.get_backend())
 
+# disparity map created with rectified images
+
 # Save the original map as dictionary to a JSON file
 def get_disparity_matrix(disparity_map_path, json_path):
     disp_16bit = cv2.imread(disparity_map_path, cv2.IMREAD_ANYDEPTH)
     disparity_map = disp_16bit.astype('float32')/256
 
-    print(disparity_map.shape)
+    #print(disparity_map.shape)
 
     '''
     disparity_dict = {}
@@ -128,44 +130,62 @@ def load_features(index):
     }
     
 ### ?????????????????????????????????????????????????????????????????????????????????????????????????? ###    
-
-# ChatGPT function to plot disparity map, probably going to be changed    
         
 # Function to create and visualize the disparity map
-def create_disparity_map_from_matches(kpts0, kpts1, matches, img_shape):
+def create_disparity_map_from_matches(x0, y0, x1, y1, matches, img_shape):
     # Initialize a zero-filled disparity map with the same shape as the input image
     disparity_map = np.zeros(img_shape, dtype=np.float32)
     
+    #disparity_map_GT[disparity_map_GT > 0] = -1 -> replace disparity_map with disparity_map_GT
+        
     # Process each match
     for i, match in enumerate(matches):
         if match != -1:  # Only consider valid matches
-            x0, y0 = int(kpts0[i, 0]), int(kpts0[i, 1])  # Keypoint in left image
-            x1, y1 = int(kpts1[match, 0]), int(kpts1[match, 1])  # Corresponding keypoint in right image
+            xd0 = int(x0[i])
+            yd0 = int(y0[i])
+            xd1 = int(x1[match])
+            yd1 = int(y1[match])
+                        
+            disparity = abs(xd0 - xd1)
             
-            # Calculate the disparity as the x-coordinate difference (x0 - x1)
-            disparity = abs(x0 - x1)
-            
-            # Set the disparity value in the map at the (y0, x0) position
-            disparity_map[y0, x0] = disparity
+            # ???
+            # incorrect calculation of disparity
+            if xd0 < xd1:
+                disparity_map[yd0, xd0:xd1] = disparity 
+            else:
+                disparity_map[yd0, xd1:xd0] = disparity
     
     return disparity_map
 
+# Custom colormap function
+def apply_custom_colormap(disparity_map):
+
+    # Create a blank color image
+    color_disparity = np.zeros((disparity_map.shape[0], disparity_map.shape[1], 3), dtype=np.uint8)
+
+    # Apply custom colormap
+    color_disparity[disparity_map < 0] = [200, 200, 200]  # White for Ground Truth
+    color_disparity[disparity_map > 0] = [0, 255, 0]  # Green for low values
+    color_disparity[disparity_map > disparity_threshold] = [0, 0, 255]  # Red for high values
+    
+    #TODO plot lines on top of the disparity_map_GT
+
+    return color_disparity
+
 # Visualization function
 def visualize_disparity_map(disparity_map):
-    # Normalize the disparity map to the range [0, 255]
-    normalized_disparity = cv2.normalize(disparity_map, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-
-    # Apply a colormap for better visualization
-    color_disparity = cv2.applyColorMap(normalized_disparity, cv2.COLORMAP_HOT)
+    # Apply custom colormap for better visualization
+    color_disparity = apply_custom_colormap(disparity_map)
 
     # Ensure no resizing of frame
-    height, width = 480, 640
+    height, width = disparity_map.shape
     dpi = 100  # Dots per inch for the figure
     fig = plt.figure(figsize=(width / dpi, height / dpi), dpi=dpi)
 
     # Plot the disparity map
     ax = fig.add_axes([0, 0, 1, 1])  # Fill the entire figure with the image
     ax.imshow(color_disparity[..., ::-1])  # Convert BGR to RGB for Matplotlib
+
     ax.axis('off')  # Turn off axis
 
     # Save the output image
@@ -182,8 +202,8 @@ print('Running inference on device \"{}\"'.format(device))
 config = {
     'superglue': {
         'weights': 'indoor',
-        'sinkhorn_iterations': 20,  # change value for sinkhorn iteration
-        'match_threshold': 0.2,     # change value for matching threshold
+        'sinkhorn_iterations': 20,  # change value for sinkhorn iteration -> 90 should get higher accuracy
+        'match_threshold': 0.2,     # !!!change value for matching threshold!!!
     }
 }
 matching = Matching(config).eval().to(device)
@@ -218,7 +238,7 @@ with open(accuracy_txt_path, 'w') as f:
     f.write("---Accuracy---\n")
 
 disparity_id = 0
-disparity_threshold = 3
+disparity_threshold = 9
 
 timer = AverageTimer()
 
@@ -255,6 +275,9 @@ while True:
     # Load disparity map (ground truth)
     disparity_map_path = f"/home/cappe/Desktop/uni5/Tesi/IIT/EventPointDatasets/DSEC/thun_00_a/thun_00_a_disparity_event/{disparity_id:06}.png" # TODO iterate through all of them
     disparity_map_GT = get_disparity_matrix(disparity_map_path, json_path = "disparity_map.json")
+    
+    #np.set_printoptions(threshold=np.inf)
+    #print("Disparity map GT: ", disparity_map_GT)
 
     kpts0 = current_data['keypoints_left1'].cpu().numpy()
     kpts1 = current_data['keypoints_right1'].cpu().numpy()
@@ -262,7 +285,7 @@ while True:
     confidence = pred['matching_scores0'][0].cpu().numpy()
     timer.update('forward')
     
-    # Debubg check
+    # Debug check
     '''        
     print("Shape of kpts0:", kpts0.shape, "kpts0:", kpts0)
     print("Shape of kpts1:", kpts1.shape, "kpts1:", kpts1)
@@ -303,16 +326,16 @@ while True:
     
     disparity_map_new = np.zeros((480, 640), dtype=np.float32)
 
-    print("kpts0 shape: ", kpts0.shape)
-    print("kpts1 shape: ", kpts1.shape)
+    #print("kpts0 shape: ", kpts0.shape)
+    #print("kpts1 shape: ", kpts1.shape)
 
-    print("mkpts0 shape:", mkpts0.shape)
-    print("mkpts1 shape:", mkpts1.shape)
+    #print("mkpts0 shape:", mkpts0.shape)
+    #print("mkpts1 shape:", mkpts1.shape)
 
     np.set_printoptions(threshold=np.inf)
 
-    print("matches shape:", matches.shape)
-    print("Element of matches: ", matches)
+    #print("matches shape:", matches.shape)
+    print("Element of matches: ", matches[matches != -1])
     
     np.set_printoptions(threshold=1000)
 
@@ -330,8 +353,8 @@ while True:
     x1 = kpts1[:, 0]
     y1 = kpts1[:, 1]
 
-    print("x0 shape: ", x0.shape)
-    print("y0 shape: ", y0.shape)
+    #print("x0 shape: ", x0.shape)
+    #print("y0 shape: ", y0.shape)
 
     # Get kpts0 coordinates
     # Get index of the match from matches
@@ -344,27 +367,34 @@ while True:
     for i, match in enumerate(matches):
         if match != -1:
             # Get corresponding coordinates values for the two keypoints
-            xd0 = x0[i]
-            ydo = y0[i]
-            xd1 = x1[match]
-            yd1 = y1[match]
+            xd0 = int(x0[i])
+            yd0 = int(y0[i])
+            xd1 = int(x1[match])
+            yd1 = int(y1[match])
+            
+            print("xd0: ", xd0, "xd1: ", xd1)
             
             disparity_match = abs(xd0 - xd1)   # TODO use euclidean distance?  
-            disparity_map_new[int(ydo), int(xd0)] = disparity_match
+            if disparity_match < disparity_threshold:
+                disparity_map_new[yd0, xd0] = disparity_match
+                disparity_matches += 1
             # TODO how to plot this?
                 
-    for i in range(disparity_map_GT.shape[0]):
-        for j in range(disparity_map_GT.shape[1]):
-            if disparity_map_new[i, j] > 0 and abs(disparity_map_GT[i, j] - disparity_map_new[i, j]) < disparity_threshold:
-                disparity_matches += 1
+    #for i in range(disparity_map_GT.shape[0]):
+    #    for j in range(disparity_map_GT.shape[1]):
+    #        if disparity_map_new[i, j] > 0 and abs(disparity_map_GT[i, j] - disparity_map_new[i, j]) < disparity_threshold:
+    #            disparity_matches += 1
                 
     total_matches = np.count_nonzero(matches != -1)    # M refers to correct matches in event data pairs       
 
     print("Number of correct matches: ", disparity_matches)
     print("Total number of matches: ", total_matches)
 
-    accuracy = disparity_matches / total_matches
-    print("Accuracy: ", accuracy*100)    
+    if total_matches == 0:
+        accuracy = 0
+    else:
+        accuracy = disparity_matches / total_matches
+        print("Accuracy: ", accuracy*100)    
     
     # Save accuracy values to a .txt file
     with open(accuracy_txt_path, 'a') as f:
@@ -372,7 +402,6 @@ while True:
 
     # Create the disparity map from the matches
     img_shape = (480, 640)
-    disparity_map = create_disparity_map_from_matches(kpts0, kpts1, matches, img_shape)
-    visualize_disparity_map(disparity_map)
-    
+    disparity_map = create_disparity_map_from_matches(x0, y0, x1, y1, matches, img_shape)
+    visualize_disparity_map(disparity_map)    
     disparity_id += 2
