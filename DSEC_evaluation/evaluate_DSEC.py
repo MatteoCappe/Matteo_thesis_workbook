@@ -45,8 +45,8 @@ def get_disparity_matrix(disparity_map_path, json_path):
 # Function to load keypoints and descriptors
 def load_features(index):
     
-    base_dir_left = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/timestamps_thun_00_a_alpha1_3-C0_3-conf0_015_left"
-    base_dir_right = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/timestamps_thun_00_a_alpha1_3-C0_3-conf0_015_right"
+    base_dir_left = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/thun_00_a_rectified_alpha1_0-C0_3_left"
+    base_dir_right = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/thun_00_a_rectified_alpha1_0-C0_3_right"
         
     if not os.path.exists(base_dir_left) or not os.path.exists(base_dir_right):
         raise ValueError(f"Directory {base_dir_left} or {base_dir_right} do not exist, check the path")  
@@ -136,7 +136,8 @@ def create_disparity_map_from_matches(x0, y0, x1, y1, matches, img_shape):
     # Initialize a zero-filled disparity map with the same shape as the input image
     disparity_map = np.zeros(img_shape, dtype=np.float32)
     
-    #disparity_map_GT[disparity_map_GT > 0] = -1 -> replace disparity_map with disparity_map_GT
+    #disparity_map_GT[disparity_map_GT > 0] = -1 # replace disparity_map with disparity_map_GT
+    #disparity_map = np.copy(disparity_map_GT)
         
     # Process each match
     for i, match in enumerate(matches):
@@ -154,8 +155,13 @@ def create_disparity_map_from_matches(x0, y0, x1, y1, matches, img_shape):
                 disparity_map[yd0, xd0:xd1] = disparity 
             else:
                 disparity_map[yd0, xd1:xd0] = disparity
+            
+            #if disparity < disparity_threshold:
+            #    disparity_map[yd0, xd0:xd1] = disparity
     
     return disparity_map
+
+# TODO: display full disparity map of matches similar to how the ground truth is displayed
 
 # Custom colormap function
 def apply_custom_colormap(disparity_map):
@@ -197,22 +203,29 @@ def visualize_disparity_map(disparity_map):
     
 ### ?????????????????????????????????????????????????????????????????????????????????????????????????? ###      
 
+disparity_id = 0
+disparity_threshold = 3 # 9, 6, 3 # !!!
+
+output_dir = "/home/cappe/Desktop/uni5/Tesi/IIT/EventPointDatasets/DSEC/thun_00_a/evaluation_rectified/0_5-3" # !!!
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print('Running inference on device \"{}\"'.format(device))
 config = {
     'superglue': {
         'weights': 'indoor',
         'sinkhorn_iterations': 20,  # change value for sinkhorn iteration -> 90 should get higher accuracy
-        'match_threshold': 0.2,     # !!!change value for matching threshold!!!
+        'match_threshold': 0.5,     # !!!change value for matching threshold!!!
     }
 }
 matching = Matching(config).eval().to(device)
 keys = ['keypoints_left', 'keypoints_right', 'scores_left', 'scores_right', 'descriptors_left', 'descriptors_right']
 
 # check VideoStreamer definition to check if its parameters are correct
-video_left_path = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/thun_00_a_alpha1_3-C0_3_left/thun_00_a_alpha1_3-C0_3_left.mp4"
+video_left_path = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/thun_00_a_rectified_alpha1_0-C0_3_left/rectified_timestamps_thun_00_a_alpha1_3-C0_3_left.mp4"
 vs_left = VideoStreamer(video_left_path, resize=[640, 480], skip=1, image_glob=['*.png', '*.jpg', '*.jpeg'], max_length=1000)     
-video_right_path = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/thun_00_a_alpha1_3-C0_3_right/thun_00_a_alpha1_3-C0_3_right.mp4"
+video_right_path = "/home/cappe/Desktop/uni5/Tesi/IIT/Algorithms/SuperPointPretrainedNetwork-master/assets/DSEC_videos/SP/thun_00_a_rectified_alpha1_0-C0_3_right/rectified_timestamps_thun_00_a_alpha1_3-C0_3_right.mp4"
 vs_right = VideoStreamer(video_right_path, resize=[640, 480], skip=1, image_glob=['*.png', '*.jpg', '*.jpeg'], max_length=1000)
 
 frame_left, ret_left = vs_left.next_frame()
@@ -220,10 +233,6 @@ assert ret_left, 'Error when reading the first frame of the left video (check di
 
 frame_right, ret_right = vs_right.next_frame()
 assert ret_right, 'Error when reading the first frame of the right video (check directory declaration?)'
-
-output_dir = "/home/cappe/Desktop/uni5/Tesi/IIT/EventPointDatasets/DSEC/thun_00_a/evaluation/"
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
 
 matches_dir = os.path.join(output_dir, "matches")
 if not os.path.exists(matches_dir):
@@ -237,10 +246,11 @@ accuracy_txt_path = os.path.join(output_dir, "accuracy.txt")
 with open(accuracy_txt_path, 'w') as f:
     f.write("---Accuracy---\n")
 
-disparity_id = 0
-disparity_threshold = 9
-
 timer = AverageTimer()
+
+total_accuracy = 0
+iterations = 0
+zero_matches = 0
 
 while True:
     
@@ -335,7 +345,7 @@ while True:
     np.set_printoptions(threshold=np.inf)
 
     #print("matches shape:", matches.shape)
-    print("Element of matches: ", matches[matches != -1])
+    #print("Element of matches: ", matches[matches != -1])
     
     np.set_printoptions(threshold=1000)
 
@@ -372,36 +382,51 @@ while True:
             xd1 = int(x1[match])
             yd1 = int(y1[match])
             
-            print("xd0: ", xd0, "xd1: ", xd1)
+            #print("xd0: ", xd0, "xd1: ", xd1)
             
             disparity_match = abs(xd0 - xd1)   # TODO use euclidean distance?  
-            if disparity_match < disparity_threshold:
-                disparity_map_new[yd0, xd0] = disparity_match
-                disparity_matches += 1
+            #if disparity_match < disparity_threshold:
+            disparity_map_new[yd0, xd0] = disparity_match
+                #disparity_matches += 1
             # TODO how to plot this?
                 
-    #for i in range(disparity_map_GT.shape[0]):
-    #    for j in range(disparity_map_GT.shape[1]):
-    #        if disparity_map_new[i, j] > 0 and abs(disparity_map_GT[i, j] - disparity_map_new[i, j]) < disparity_threshold:
-    #            disparity_matches += 1
+    for i in range(disparity_map_GT.shape[0]):
+        for j in range(disparity_map_GT.shape[1]):
+            if disparity_map_new[i, j] > 0 and abs(disparity_map_GT[i, j] - disparity_map_new[i, j]) < disparity_threshold:
+                disparity_matches += 1
+    
+    # rifare confronto con GT e confronto con match_threshold = 0.9
                 
     total_matches = np.count_nonzero(matches != -1)    # M refers to correct matches in event data pairs       
 
     print("Number of correct matches: ", disparity_matches)
     print("Total number of matches: ", total_matches)
-
+    
     if total_matches == 0:
         accuracy = 0
+        zero_matches += 1
     else:
         accuracy = disparity_matches / total_matches
-        print("Accuracy: ", accuracy*100)    
+        print("Accuracy: ", accuracy*100)  
+        iterations += 1
+        
+        
+    total_accuracy += accuracy*100
+    ratio = f"{disparity_matches}/{total_matches}"
     
     # Save accuracy values to a .txt file
     with open(accuracy_txt_path, 'a') as f:
-        f.write(f"Accuracy disparity_map_frame_{disparity_id}: {100*accuracy:.4f}\n")
+        f.write(f"Accuracy disparity_map_frame_{disparity_id}: {ratio} -> {100*accuracy:.4f}\n")
 
     # Create the disparity map from the matches
     img_shape = (480, 640)
     disparity_map = create_disparity_map_from_matches(x0, y0, x1, y1, matches, img_shape)
     visualize_disparity_map(disparity_map)    
     disparity_id += 2
+    
+print(f"Average accuracy: {(total_accuracy/iterations):.4f}\n")
+print("Threshold: ", disparity_threshold)
+print(f"Number of sequences with no matches: {zero_matches}")
+with open(accuracy_txt_path, 'a') as f:
+    f.write(f"Average accuracy: {(total_accuracy/iterations):.4f}\n")
+    f.write(f"Threshold: {disparity_threshold}\n")
