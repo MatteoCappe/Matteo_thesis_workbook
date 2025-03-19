@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
         scarf.initialise(res, rf.check("block_size", Value(14)).asInt32(), rf.check("alpha", Value(1.0)).asFloat64(), rf.check("C", Value(0.3)).asFloat64());
 
         int i = 1;
-        bool first_frame_saved = true;
+        bool first_frame_saved = false;
         const double save_interval = 0.1; // Save frames every 0.1 seconds
         double next_save_time = 0.06667;
 
